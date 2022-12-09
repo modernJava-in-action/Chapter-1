@@ -104,8 +104,124 @@ Java8에서는 메서드(우리 코드)를 다른 메서드의 인수로 넘겨�
   
 물론 기존처럼 synchronized를 사용할 수 있습니다.(일반적으로 synchronized는 시스템 성능에 악영향을 미칩니다.)    
 ## 1.3 자바 함수
+프로그래밍 언어에서 **함수**라는 용어는 **메서드(특히 정적 메서드)**와 같은 의미로 사용됩니다.  
+자바의 함수는 이에 더해 수학적인 함수처럼 사용되며 부작용을 일으키지 않는 함수를 의미합니다.  
+
+**`Java8에서는 함수를 새로운 값의 형식`**으로 추가했습니다.자바 프로그램에서 조작할 수 있는 값을 생각해봅시다.  
+1. int형식, double 형식 등의 기본값  
+2. 객체. 객체 참조는 클래스의 **인스턴스**를 가리킵니다.  
+
+프로그래밍 언어의 핵심은 값을 바꾸는 것입니다. 이 값을 **일급 값 또는 일급 시민** 이라고 부릅니다.  
+구조체(메서드, 클래스 같은) 전달할 수 없는 것들은 이급 시민입니다.  
+예를 들어 런타임에 메서드를 전달할 수 있다면, 즉 메서드를 일급 시민으로 만들면 프로그래밍에 유용하게 활용할 수 있습니다.  
+  
+따라서 Java8 설계자들은 이급 시민을 일급 시민으로 바꿀 수 있는 기능을 추가했습니다.    
 
 ### 1.3.1 메서드와 람다를 일급 시민으로
+Java8에서 메서드를 값으로 취급할 수 있는 기능은 스트림 같은 다른 Java8 기능의 토대를 제공했습니다.  
+
+**메서드 참조(method reference)**에 대해 알아봅니다.  
+  
+디렉터리에서 모든 숨겨진 파일을 필터링한다고 가정합니다. File클래스는 이미 isHidden메서드를 제공합니다.
+```java
+File[] hiddenFiles = new File(".").listFiles(new FileFilter() {
+      @Override
+      public boolean accept(File file) {
+        return file.isHidden();
+      }
+    });
+```
+File 클래스에는 이미 isHidden이라는 메서드가 있는데 굳이 FileFilter로 isHidden을 복잡하게 감싼 다음에 FileFilter를 인스턴스화(클래스로부터 객체를 만듦)해야 할까요?  
+Java8에서는 다음처럼 구현 가능합니다.  
+`File[] hiddenFilesWithMethodReference = new File(".").listFiles(File::isHidden);`  
+isHidden이라는 함수는 이미 준비되어 있으므로 메서드 참조를 이용해서 listFiles에 직접 전달할 수 있습니다.  
+  
+기존에 객체 참조(new로 객체 참조를 생성함)를 이용해서 객체를 주고받았던 것처럼 Java8에서는 `File::isHidden`을 이용해서 메서드 참조를 만들어 전달할 수 있게 되었습니다.  
+  
+Java8에서는 메서드를 일급값으로 취급할 뿐 아니라 **람다**를 포함하여 함수도 값으로 취급할 수 있습니다.  
+람다 문법 형식으로 구현된 프로그램을 **함수형 프로그래밍, 즉 '함수를 일급값으로 넘겨주는 프로그램을 구현한다'**라고 합니다.  
+
+### 1.3.2 코드 넘겨주기 : 예제
+모든 녹색 사과를 선택해서 리스트를 반환하는 프로그램은 다음과 같습니다. 이처럼 특정 항목을 선택해서 반환하는 동작을 **필터**라고 합니다.  
+Java8 이전의 메서드 구현  
+```java
+  public static List<Apple> filterGreenApples(List<Apple> inventory) {
+    List<Apple> result = new ArrayList<>();
+
+    for (Apple apple : inventory) {
+      if ("green".equals(apple.getColor())) {
+        result.add(apple);
+      }
+    }
+    return result;
+  }
+```
+누군가가 사과를 무게(예를 들어 150그램 이상)으로 필터링하고 싶을 수 있습니다. 그러면 다음처럼 코드를 구현할 수 있습니다.  
+```java
+ public static List<Apple> filterHeavyApples(List<Apple> inventory) {
+    List<Apple> result = new ArrayList<>();
+
+    for (Apple apple : inventory) {
+      if (apple.getWeight() > 150) {
+        result.add(apple);
+      }
+    }
+    return result;
+  }
+```
+다행히 Java8에서는 코드를 인수로 넘겨줄 수 있으므로 filter 메서드를 중복으로 구현할 필요가 없습니다.  
+```java
+public static boolean isGreenApple(Apple apple) {
+  return "green".equals(apple.getColor()); //녹색 사과 필터링 
+}
+
+public static boolean isHeavyApple(Apple apple) {
+  return apple.getWeight() > 150; //무거운 사과 필터링
+}
+
+public interface Predicate<T> {
+  boolean test(T t);
+}
+
+static List<Apple> filterApples(List<Apple> inventory, Predicate<Apple> p) {
+  //메서드가 p라는 이름의 프레디케이트 파라미터로 전달됨. 
+  List<Apple> result = new ArrayList<>();
+
+  for (Apple apple : inventory) {
+    if (p.test(apple)) { //사과는 p가 제시하는 조건에 맞는가?
+      result.add(apple); 
+    }
+  }
+  return result;
+}  
+
+```  
+메서드 호출은 다음처럼 가능합니다.  
+```java
+filterApples(inventory, Apple::isGreenApple);
+filterApples(inventory, Apple::isHeavyApple);
+```
+수학에서는 인수로 값을 받아 true나 false를 반환하는 함수를 프레디케이트 라고 합니다.  
+  
+메서드 전달 대신 익명 함수 또는 람다를 이용해서 코드를 구현할 수 있습니다.
+```java
+filterApples(inventory, (Apple a) -> "green".equals(a.getColor()));
+filterApples(inventory, (Apple a) -> a.getWeight() > 150);
+filterApples(inventory, (Apple a) -> a.getWeight() < 80 || "red".equals(a.getColor()));
+```
+람다가 몇 줄 이상으로 길어진다면 익명 람다보다는 메서드를 정의하고 메서드 참조를 활용하는 것이 바람직합니다.  
+
+`filter(inventory, (Apple a) -> a.getWeight() > 150);`와 같이 라이브러리 메서드 filter를 이용하면 filterApples 메서드를 구현할 필요가 없지만,  
+`병렬성`이라는 중요성때문에 이와 같은 설계를 포기했습니다.  
+  
+대신 Java8에서 filter와 비슷한 동작을 수행하는 연산집합을 포함하는 새로운 스트림 API를 제공합니다.  
+또한 컬렉션과 스트림 간에 변환할 수 있는 메서드(map, reduce 등)도 제공합니다.  
+
+## 1.4 스트림
+
+## 1.5 
+
+
 
 
 
